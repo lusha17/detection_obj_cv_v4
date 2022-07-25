@@ -7,14 +7,19 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import pytz
+import av
 import datetime
 import matplotlib.colors as mcolors
 from PIL import Image
+import time
+
 import threading
 lock = threading.Lock()
+
 from streamlit_webrtc import VideoProcessorBase, webrtc_streamer, WebRtcMode
-CLASSES_CUSTOM_M = [ 'bill', 'card', 'face', 'knife', 'mask', 'firearm', 'purse', 'smartphone']
-CLASSES_CUSTOM_S = [ 'bill', 'card', 'face', 'knife', 'mask', 'firearm', 'purse', 'smartphone']
+
+#CLASSES_CUSTOM_M = [ 'bill', 'card', 'face', 'knife', 'mask', 'firearm', 'purse', 'smartphone']
+CLASSES_CUSTOM = [ 'bill', 'card', 'face', 'knife', 'mask', 'firearm', 'purse', 'smartphone']
 CLASSES_BASE= [ 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 
             'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 
             'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 
@@ -33,66 +38,33 @@ CLASSES_BASE= [ 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
 
 WEBRTC_CLIENT_SETTINGS = ClientSettings(
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-        media_stream_constraints={"video": True, "audio": False},
-    )
+        media_stream_constraints={"video": True, "audio": False},)
 
 DEFAULT_CONFIDENCE_THRESHOLD = 0.5
 
-
-class Detection(NamedTuple):
-    name: str
-    prob: float
-
 result_queue = [] 
 
-
-st.set_page_config(
-    page_title="Weapon Detection Demo",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="Weapon Detection Demo", layout="wide", initial_sidebar_state="collapsed")
 
 st.sidebar.markdown("""<center data-parsed=""><img src="http://drive.google.com/uc?export=view&id=1Mad62XWdziqcx9wijUODpzGzqYEGhafC" align="center"></center>""",unsafe_allow_html=True,)
 st.sidebar.markdown(" ")
 st.title('Weapon Detection Demo')
 
-#region Functions
-# --------------------------------------------
 
-
-
-@st.cache(max_entries=2)
+#@st.cache(max_entries=2)
 def get_yolo5(label):
     if label=='Base':
         return torch.hub.load('ultralytics/yolov5', 'custom', path='yolov5m.pt')  
-    elif label=='Custom small':
-        return torch.hub.load('ultralytics/yolov5', 'custom', path='all_s.pt')
     else:
         return torch.hub.load('ultralytics/yolov5', 'custom', path='all_m.pt')
 
-#@st.cache(max_entries=10)
-def get_preds(img : np.ndarray) -> np.ndarray:
+def get_preds(img):
     return model([img]).xyxy[0].numpy()
 
-def get_colors(indexes : List[int]) -> dict:
-    '''
-    Возвращает цвета для всех выбранных классов. Цвета формируются 
-    на основе наборов TABLEAU_COLORS и BASE_COLORS из Matplotlib
-    Arguments
-    ----------
-    indexes : list of int
-        список индексов классов в порядке по умолчанию для 
-        MS COCO (80 классов, без background)
-    Returns
-    -------
-    dict
-        словарь, в котором ключи - id классов, указанные в 
-        indexes, а значения - tuple с компонентами rgb цвета, например, (0,0,0)
-    '''
+def get_colors(indexes):
     to_255 = lambda c: int(c*255)
     tab_colors = list(mcolors.TABLEAU_COLORS.values())
-    tab_colors = [list(map(to_255, mcolors.to_rgb(name_color))) 
-                                                for name_color in tab_colors]
+    tab_colors = [list(map(to_255, mcolors.to_rgb(name_color))) for name_color in tab_colors]
     base_colors = list(mcolors.BASE_COLORS.values())
     base_colors = [list(map(to_255, name_color)) for name_color in base_colors]
     rgb_colors = tab_colors + base_colors
@@ -104,27 +76,6 @@ def get_colors(indexes : List[int]) -> dict:
         else:
             color_dict[index] = (255,0,0)
     return color_dict
-
-def get_legend_color(class_name : int):
-    """
-    Возвращает цвет ячейки для `pandas.Styler` при создании легенды. 
-    Раскарасит ячейку те же цветом, который имеют боксы соотвествующего класс
-    Arguments
-    ---------
-    class_name : int
-        название класса согласно списку классов MS COCO
-    Returns
-    -------
-    str
-        background-color для ячейки, содержащей class_name
-    """  
-
-    index = CLASSES.index(class_name)
-    color = rgb_colors[index]
-    return 'background-color: rgb({color[0]},{color[1]},{color[2]})'.format(color=color)
-
-
-import av
 
 
 def transform(frame):
@@ -141,33 +92,45 @@ def transform(frame):
             xtext = xmin + 10
             class_ = CLASSES[label]
             if (class_ == 'firearm') | (class_ == 'knife'):
-                #pass
                 time_detect = datetime.datetime.now(pytz.timezone("America/New_York")).replace(tzinfo=None).strftime("%m-%d-%y %H:%M:%S")
                 with lock:
-                    result_queue.append({'object': class_, 'time_detect': time_detect})
+                    result_queue.append({'object': class_, 'time_detect': time_detect, 'confident': str(conf.round(2))})
             text_for_vis = '{} {}'.format(class_, str(conf.round(2)))
             img = cv2.putText(img, text_for_vis, (int(xtext), int(ytext)),cv2.FONT_HERSHEY_SIMPLEX,0.5,rgb_colors[label],2,)
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 
-model_type = st.sidebar.selectbox('Select model type',('Base', 'Custom medium', 'Custom small'),index=2)
+model_type = st.sidebar.selectbox('Select model type', ('Base', 'Custom'), index=1)
+
 with st.spinner('Loading the model...'):
-    model = get_yolo5(model_type)
+    if model_type == 'Base':
+        cache_key = 'base'
+        if cache_key in st.session_state:
+            model = st.session_state[cache_key]
+        else:
+            model = get_yolo5(model_type)
+            st.session_state[cache_key] = model
+    else:
+        cache_key = 'custom'
+        if cache_key in st.session_state:
+            model = st.session_state[cache_key]
+        else:
+            model = get_yolo5(model_type)
+            st.session_state[cache_key] = model
+
 st.success('Loading the model.. Done!')
 
 confidence_threshold = st.slider("Confidence threshold", 0.0, 1.0, DEFAULT_CONFIDENCE_THRESHOLD, 0.05)
 
-prediction_mode = st.sidebar.radio("",('Single image', 'Web camera'),index=1)
+prediction_mode = st.sidebar.radio("", ('Single image', 'Web camera'), index=1)
 
 if model_type == 'Base':
     CLASSES = CLASSES_BASE
     classes_selector = st.sidebar.multiselect('Select classes', CLASSES, default='person')
-elif model_type == 'Custom small':
-    CLASSES = CLASSES_CUSTOM_S
-    classes_selector = st.sidebar.multiselect('Select classes', CLASSES, default='firearm')
 else:
-    CLASSES = CLASSES_CUSTOM_M
+    CLASSES = CLASSES_CUSTOM
     classes_selector = st.sidebar.multiselect('Select classes', CLASSES, default='firearm')
+
 all_labels_chbox = st.sidebar.checkbox('All classes', value=True)
 
 
@@ -181,29 +144,19 @@ else:
 
 rgb_colors = get_colors(target_class_ids)
 detected_ids = None
-import time
 
 if prediction_mode == 'Single image':
-    uploaded_file = st.file_uploader(
-        "Choose an image",
-        type=['png', 'jpg', 'jpeg'])
-    # если файл загружен
+    uploaded_file = st.file_uploader("Choose an image", type=['png', 'jpg', 'jpeg'])
     if uploaded_file is not None:
-        # конвертация изображения из bytes в np.ndarray
         bytes_data = uploaded_file.getvalue()
         file_bytes = np.asarray(bytearray(bytes_data), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         result = get_preds(img)
-        #скопируем результаты работы кэшируемой функции, чтобы не изменить кэш
         result_copy = result.copy()
-        #отберем только объекты нужных классов
         result_copy = result_copy[np.isin(result_copy[:,-1], target_class_ids)]
         detected_ids = []
-        #также скопируем изображение, чтобы не изменить аргумент кэшируемой 
-        # функции get_preds
         img_draw = img.copy().astype(np.uint8)
-        # нарисуем боксы для всех найденных целевых объектов
         for bbox_data in result_copy:
             xmin, ymin, xmax, ymax, conf, label = bbox_data
             if conf > confidence_threshold:
