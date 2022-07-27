@@ -48,6 +48,17 @@ st.set_page_config(page_title="Weapon Detection Demo", layout="wide", initial_si
 
 st.sidebar.markdown("""<center data-parsed=""><img src="http://drive.google.com/uc?export=view&id=1Mad62XWdziqcx9wijUODpzGzqYEGhafC" align="center"></center>""",unsafe_allow_html=True,)
 st.sidebar.markdown(" ")
+
+from streamlit.legacy_caching import clear_cache
+
+def reload():
+    clear_cache()
+    st.experimental_rerun()
+
+pages = st.sidebar.columns([1, 1, 1])
+if pages[1].button("Reload App"):
+    reload()
+
 st.title('Weapon Detection Demo')
 
 
