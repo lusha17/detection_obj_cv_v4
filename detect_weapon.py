@@ -2,6 +2,7 @@ from typing import List
 from streamlit_webrtc import ClientSettings
 from typing import List, NamedTuple, Optional
 import cv2
+import base64
 import torch
 import numpy as np
 import pandas as pd
@@ -90,12 +91,15 @@ def func_detect_weapon():
                 ytext = ymin - 10 if ymin - 10 > 10 else ymin + 15
                 xtext = xmin + 10
                 class_ = CLASSES[label]
+                text_for_vis = '{} {}'.format(class_, str(conf.round(2)))
+                img = cv2.putText(img, text_for_vis, (int(xtext), int(ytext)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rgb_colors[label], 2,)
                 if (class_ == 'firearm') | (class_ == 'knife'):
                     time_detect = datetime.datetime.now(pytz.timezone("America/New_York")).replace(tzinfo=None).strftime("%m-%d-%y %H:%M:%S")
+                    retval, buffer_img= cv2.imencode('.jpg', img)
+                    data = base64.b64encode(buffer_img).decode("utf-8")
+                    html = "<img src='data:image/jpg;base64," + data + f"""' style='display:block;margin-left:auto;margin-right:auto;width:200px;border:0;'>"""
                     with lock:
-                        result_queue.append({'object': class_, 'time_detect': time_detect, 'confident': str(conf.round(2))})
-                text_for_vis = '{} {}'.format(class_, str(conf.round(2)))
-                img = cv2.putText(img, text_for_vis, (int(xtext), int(ytext)),cv2.FONT_HERSHEY_SIMPLEX,0.5,rgb_colors[label],2,)
+                        result_queue.insert(0, {'object': class_, 'time_detect': time_detect, 'confident': str(conf.round(2)), 'img': html})
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 
@@ -172,7 +176,8 @@ def func_detect_weapon():
             if ctx.state.playing:
                 labels_placeholder = st.empty()
                 while True:
-                    time.sleep(1)
+                    time.sleep(0.5)
                     with lock:
-                        result_queue = result_queue[-7:]
-                        labels_placeholder.dataframe(result_queue)
+                        result_queue = result_queue[:5]
+                        df = pd.DataFrame(result_queue)
+                        labels_placeholder.write(df.to_html(escape=False), unsafe_allow_html=True)
