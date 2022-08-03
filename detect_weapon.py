@@ -93,7 +93,7 @@ def func_detect_weapon():
                 class_ = CLASSES[label]
                 text_for_vis = '{} {}'.format(class_, str(conf.round(2)))
                 img = cv2.putText(img, text_for_vis, (int(xtext), int(ytext)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rgb_colors[label], 2,)
-                if (class_ == 'firearm') | (class_ == 'knife'):
+                if ((class_ == 'firearm') | (class_ == 'knife')) & agree:
                     time_detect = datetime.datetime.now(pytz.timezone("America/New_York")).replace(tzinfo=None).strftime("%m-%d-%y %H:%M:%S")
                     retval, buffer_img= cv2.imencode('.jpg', img)
                     data = base64.b64encode(buffer_img).decode("utf-8")
