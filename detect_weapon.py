@@ -41,7 +41,7 @@ def func_detect_weapon():
             rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
             media_stream_constraints={"video": True, "audio": False},)
 
-    DEFAULT_CONFIDENCE_THRESHOLD = 0.5
+    DEFAULT_CONFIDENCE_THRESHOLD = 0.6
 
     result_queue = [] 
 
