@@ -20,3 +20,4 @@ pydub==0.25.1
 typing_extensions==4.1.1
 pytz
 mediapipe==0.8.6
+ipython
