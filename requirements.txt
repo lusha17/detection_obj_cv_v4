@@ -2,11 +2,11 @@
 torch==1.7.1+cpu
 torchvision==0.8.2+cpu
 #opencv-python==4.5.1.48
-opencv-python-headless==4.5.3.56
+#opencv-python-headless==4.5.3.56
 Pillow==8.0.1
 pandas==1.2.1
-streamlit==1.10
-streamlit-webrtc==0.42
+streamlit==1.14.1
+streamlit-webrtc==0.44
 matplotlib==3.5.1
 tqdm==4.56.0
 PyYAML==5.3.1

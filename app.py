@@ -3,9 +3,9 @@ import sys
 import gc
 sys.path.append('mediapipe')
 from detect_weapon import func_detect_weapon
-from streamlitMediapipe import mediapipe_f
+#from streamlitMediapipe import mediapipe_f
 from detect_fire_smoke import func_detect_fire_smoke
-from streamlit.legacy_caching import clear_cache
+#from streamlit.legacy_caching import clear_cache
 
 def main():
     gc.enable()
@@ -13,7 +13,6 @@ def main():
 
     pages_1 = {
         "Real time hand items detection": func_detect_weapon,
-        "Personality and action recognition": mediapipe_f,
         "Real time fire and smoke detection": func_detect_fire_smoke
     }
     page_titles = pages_1.keys()
@@ -22,7 +21,7 @@ def main():
     st.sidebar.markdown(" ")
     
     def reload():
-        clear_cache()
+        #clear_cache()
         gc.collect()
         st.experimental_rerun()
 

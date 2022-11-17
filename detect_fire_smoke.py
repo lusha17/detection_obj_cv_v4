@@ -15,7 +15,7 @@ from PIL import Image
 import time
 import threading
 from streamlit_webrtc import VideoProcessorBase, webrtc_streamer, WebRtcMode
-from streamlit.legacy_caching import clear_cache
+#from streamlit.legacy_caching import clear_cache
 
 lock = threading.Lock()
 
